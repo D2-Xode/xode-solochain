@@ -147,6 +147,10 @@ impl pallet_session::Config for Runtime {
 	type Keys = SessionKeys;
 	type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
 	type DisablingStrategy = pallet_session::disabling::UpToLimitDisablingStrategy;
+	type Currency = Balances;
+	/// No deposit is held for registering session keys, matching the behaviour before
+	/// `pallet_session` gained key deposits.
+	type KeyDeposit = ();
 }
 
 impl pallet_authorship::Config for Runtime {
@@ -300,6 +304,7 @@ impl pallet_assets::Config for Runtime {
 	type Balance = Balance;
 	type AssetId = u32;
 	type AssetIdParameter = codec::Compact<u32>;
+	type ReserveData = ();
 	type Currency = Balances;
 	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
 	type ForceOrigin = EnsureRoot<AccountId>;
@@ -348,6 +353,8 @@ impl pallet_treasury::Config for Runtime {
 	type BalanceConverter = UnityAssetBalanceConversion;
 	type PayoutPeriod = TreasuryPayoutPeriod;
 	type BlockNumberProvider = System;
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
 }
 
 parameter_types! {

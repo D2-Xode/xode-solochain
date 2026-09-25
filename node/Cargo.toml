@@ -81,6 +81,11 @@ sp-timestamp.default-features = true
 sp-timestamp.workspace = true
 substrate-frame-rpc-system.default-features = true
 substrate-frame-rpc-system.workspace = true
+# Not used by the node itself. `frame-benchmarking-cli` pulls `pallet-staking` in (via
+# `frame-storage-access-test-runtime`), and it fails to compile once the runtime's
+# `pallet-session/try-runtime` is unified in without `pallet-staking/try-runtime`. Depending on it
+# optionally lets the `try-runtime` feature below turn that on.
+pallet-staking = { optional = true, default-features = true, workspace = true }
 
 [build-dependencies]
 substrate-build-script-utils.default-features = true
@@ -102,6 +107,7 @@ runtime-benchmarks = [
 # in the near future.
 try-runtime = [
 	"frame-system/try-runtime",
+	"pallet-staking/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"xode-solochain-runtime/try-runtime",
 	"sp-runtime/try-runtime",
