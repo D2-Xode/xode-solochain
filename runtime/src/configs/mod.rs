@@ -41,18 +41,20 @@ use frame_support::{
 use frame_system::{limits::{BlockLength, BlockWeights}, EnsureRoot, EnsureSigned, EnsureWithSuccess};
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use pallet_assets_precompiles::{InlineIdConfig, ERC20};
 use sp_runtime::{
 	traits::{AccountIdConversion, Convert, IdentityLookup, One},
-	Perbill, Permill,
+	FixedU128, Perbill, Permill,
 };
 use sp_version::RuntimeVersion;
 
 // Local module imports
 use super::{
-	AccountId, Aura, Balance, Balances, Block, BlockNumber, Grandpa, Hash, Nonce, OriginCaller,
-	PalletInfo, RandomnessCollectiveFlip, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
-	RuntimeHoldReason, RuntimeOrigin, RuntimeTask, SessionKeys, System, Timestamp, XodeStaking,
-	DAYS, EXISTENTIAL_DEPOSIT, HOURS, MICRO_UNIT, MILLI_UNIT, SLOT_DURATION, UNIT, VERSION,
+	AccountId, Address, Aura, Balance, Balances, Block, BlockNumber, EthExtraImpl, Grandpa, Hash,
+	Nonce, OriginCaller, PalletInfo, RandomnessCollectiveFlip, Runtime, RuntimeCall, RuntimeEvent,
+	RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask, SessionKeys, Signature,
+	System, Timestamp, XodeStaking, DAYS, EXISTENTIAL_DEPOSIT, HOURS, MICRO_UNIT, MILLI_UNIT,
+	SLOT_DURATION, UNIT, VERSION,
 };
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
@@ -216,7 +218,11 @@ impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnChargeTransaction = FungibleAdapter<Balances, ()>;
 	type OperationalFeeMultiplier = ConstU8<5>;
-	type WeightToFee = IdentityFee<Balance>;
+	/// `pallet_revive` only works with its `BlockRatioFee`, because its gas mapping depends on it.
+	/// A 1/1 ratio charges one unit per unit of `ref_time`, exactly like the `IdentityFee` used
+	/// before: its `proof_size` component is proof_size * max ref_time / max proof_size, which is
+	/// negligible here because `RuntimeBlockWeights` doesn't limit proof size (`u64::MAX`).
+	type WeightToFee = pallet_revive::evm::fees::BlockRatioFee<1, 1, Runtime, Balance>;
 	type LengthToFee = IdentityFee<Balance>;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
 	type WeightInfo = pallet_transaction_payment::weights::SubstrateWeight<Runtime>;
@@ -398,4 +404,70 @@ impl pallet_contracts::Config for Runtime {
 	type Environment = ();
 	type ApiVersion = ();
 	type Xcm = ();
+}
+
+/// Storage deposit for `items` storage items taking up `bytes` bytes, the same formula as the
+/// live Xode parachain uses.
+pub const fn deposit(items: u32, bytes: u32) -> Balance {
+	(items as Balance * 20 * UNIT + (bytes as Balance) * 100 * MICRO_UNIT) / 100
+}
+
+/// The EIP-155 chain id Ethereum wallets and transactions use for this chain. Deliberately
+/// different from the parachain's (3417), so that Ethereum transactions signed for one chain
+/// can't be replayed on the other.
+pub const EVM_CHAIN_ID: u64 = 34170;
+
+/// Wei per ETH.
+const ETH: Balance = 1_000_000_000_000_000_000;
+
+parameter_types! {
+	// 10^18 / 10^12: one plank of XON is 10^6 wei.
+	pub const NativeToEthRatio: u32 = (ETH / UNIT) as u32;
+	// Revive's own deposit parameters, the parachain's values. `pallet_contracts` above keeps its
+	// own, separate ones.
+	pub const ReviveDepositPerItem: Balance = deposit(1, 0);
+	pub const ReviveDepositPerByte: Balance = deposit(0, 1);
+	pub const ReviveDepositPerChildTrieItem: Balance = deposit(1, 0) / 100;
+	pub const ReviveCodeHashLockupDepositPercent: Perbill = Perbill::from_percent(0);
+	pub const MaxEthExtrinsicWeight: FixedU128 = FixedU128::from_rational(9, 10);
+}
+
+/// Configure `pallet-revive`: Ethereum-compatible smart contracts.
+///
+/// Contracts compiled to EVM bytecode by standard `solc` run as-is (`AllowEVMBytecode`). Assets
+/// of `pallet_assets` are exposed to them through an ERC20 precompile at the same addresses as
+/// on the parachain.
+impl pallet_revive::Config for Runtime {
+	type Time = Timestamp;
+	type Balance = Balance;
+	type Currency = Balances;
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type RuntimeOrigin = RuntimeOrigin;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type WeightInfo = pallet_revive::weights::SubstrateWeight<Self>;
+	/// ERC20 interface for `Assets`, at `[asset id: 4 bytes][12 zero bytes]0x0120 0x0000`. Same
+	/// prefix as the parachain, so an asset has the same ERC20 address on both chains.
+	type Precompiles = (ERC20<Self, InlineIdConfig<0x120>, ()>,);
+	type FindAuthor = <Runtime as pallet_authorship::Config>::FindAuthor;
+	type DepositPerByte = ReviveDepositPerByte;
+	type DepositPerItem = ReviveDepositPerItem;
+	type DepositPerChildTrieItem = ReviveDepositPerChildTrieItem;
+	type CodeHashLockupDepositPercent = ReviveCodeHashLockupDepositPercent;
+	type AddressMapper = pallet_revive::AccountId32Mapper<Self>;
+	/// Only gates `#[unstable]` host functions of PolkaVM contracts; nothing here needs them.
+	type UnsafeUnstableInterface = ConstBool<false>;
+	type AllowEVMBytecode = ConstBool<true>;
+	type UploadOrigin = EnsureSigned<AccountId>;
+	type InstantiateOrigin = EnsureSigned<AccountId>;
+	// 128 MiB and 512 MiB, as on the parachain. Only used by the pallet's integrity test to check
+	// that its limits fit into the runtime's memory.
+	type RuntimeMemory = ConstU32<{ 128 * 1024 * 1024 }>;
+	type PVFMemory = ConstU32<{ 512 * 1024 * 1024 }>;
+	type ChainId = ConstU64<EVM_CHAIN_ID>;
+	type NativeToEthRatio = NativeToEthRatio;
+	type FeeInfo = pallet_revive::evm::fees::Info<Address, Signature, EthExtraImpl>;
+	type MaxEthExtrinsicWeight = MaxEthExtrinsicWeight;
+	type DebugEnabled = ConstBool<false>;
+	type GasScale = ConstU32<1000>;
 }

@@ -109,6 +109,84 @@ available on [IPFS](https://dotapps.io/). You can
 also find the source code and instructions for hosting your own instance in the
 [`polkadot-js/apps`](https://github.com/polkadot-js/apps) repository.
 
+### EVM Compatibility and Ethereum JSON-RPC
+
+The runtime includes `pallet-revive`, so the chain accepts Ethereum transactions and runs
+Solidity contracts compiled to EVM bytecode with standard `solc`. Its EVM chain id is **34170**.
+
+The node itself does not serve the Ethereum JSON-RPC API (`eth_*`). That is done by Parity's
+separate `eth-rpc` binary (crate `pallet-revive-eth-rpc`), which connects to the node's WebSocket
+RPC. It must come from the same polkadot-sdk release as the runtime, because it decodes the
+runtime's `ReviveApi` results. This repository is on polkadot-sdk **stable2512**
+(`pallet-revive` 0.12.2), which matches the **`polkadot-stable2512-2`** release.
+
+Install `eth-rpc` in one of these two ways:
+
+- Download the prebuilt binary (Linux x86_64; macOS arm64 is `eth-rpc-aarch64-apple-darwin`)
+  from the [`polkadot-stable2512-2`
+  release](https://github.com/paritytech/polkadot-sdk/releases/tag/polkadot-stable2512-2) and
+  check it against the published checksum:
+
+  ```sh
+  curl -LO https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-stable2512-2/eth-rpc
+  curl -LO https://github.com/paritytech/polkadot-sdk/releases/download/polkadot-stable2512-2/eth-rpc.sha256
+  sha256sum -c eth-rpc.sha256 && chmod +x eth-rpc
+  ```
+
+- Or build it from source at the same release tag:
+
+  ```sh
+  cargo install --locked --git https://github.com/paritytech/polkadot-sdk \
+    --tag polkadot-stable2512-2 pallet-revive-eth-rpc
+  ```
+
+Don't use `cargo install pallet-revive-eth-rpc --version 0.12.0 --locked` from crates.io: that
+package's lockfile pins `pallet-revive` 0.12.0, whose runtime API result types differ from the
+0.12.2 used here, so gas estimation and `eth_call` would break.
+
+To run it against a local development chain:
+
+```sh
+# Terminal 1: the node, with its RPC on ws://127.0.0.1:9944
+./target/release/xode-solochain-node --dev
+
+# Terminal 2: eth-rpc, serving Ethereum JSON-RPC on http://127.0.0.1:8545
+./eth-rpc --dev --node-rpc-url ws://127.0.0.1:9944
+```
+
+| Port  | Process | Purpose |
+|-------|---------|---------|
+| 9944  | node    | Substrate JSON-RPC (HTTP and WebSocket). `eth-rpc` connects here. |
+| 30333 | node    | p2p |
+| 9615  | node    | Prometheus metrics |
+| 8545  | eth-rpc | Ethereum JSON-RPC (HTTP and WebSocket). Point wallets and tools here. |
+| 9616  | eth-rpc | Prometheus metrics |
+
+Use `--rpc-port` to move `eth-rpc` off 8545. Its `--dev` flag allows CORS from any origin; drop
+it outside development.
+
+The `dev` and `local` chain specs pre-fund the well-known Ethereum development accounts, the
+same ones Parity's tooling and `eth-rpc --dev` use. Their keys are public, so never use them
+outside a development chain:
+
+| Name      | Address                                      | Private key |
+|-----------|----------------------------------------------|-------------|
+| Alith     | `0xf24FF3a9CF04c71Dbc94D0b566f7A27B94566cac` | `0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133` |
+| Baltathar | `0x3Cd0A705a2DC65e5b1E1205896BaA2be8A07c6e0` | `0x8075991ce870b93a8870eca0c0f91913d12f47948ca0fd25b49c6fa7cdbeee8b` |
+| Charleth  | `0x798d4Ba9baf0064Ec19eB4F0a1a45785ae9D6DFc` | `0x0b6e18cafb6ed99687ec547bd28139cafdd2bffe70e6b688025de6b445aa5c5b` |
+| Dorothy   | `0x773539d4Ac0e786233D90A233654ccEE26a613D9` | `0x39539ab1876910bbf3a223d84a29e28f1cb4e2e456503e7e91ed39b2e7223d68` |
+| Ethan     | `0xFf64d3F6efE2317EE2807d223a0Bdc4c0c49dfDB` | `0x7dce9bc8babb68fec1409be38c8e1a52650206a7ed90ff956ae8a6d15eeaaef4` |
+
+Assets of `pallet-assets` are available to contracts as ERC20 tokens at
+`0x[asset id as 8 hex digits]000000000000000000000000` + `01200000`, for example asset 1 at
+`0x0000000100000000000000000000000001200000`, the same addresses as on the Xode parachain.
+
+`eth_getBalance` reports what an account can spend: its free balance minus whatever must stay
+(the existential deposit, or frozen funds), times 10^6 (one plank of XON is 10^6 wei).
+
+[`scripts/evm-smoke-test`](./scripts/evm-smoke-test) checks all of this end to end against a
+running `--dev` node and `eth-rpc`.
+
 ### Multi-Node Local Testnet
 
 If you want to see the multi-node consensus algorithm in action, see [Simulate a

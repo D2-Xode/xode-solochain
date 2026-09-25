@@ -15,14 +15,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{AccountId, BalancesConfig, RuntimeGenesisConfig, SessionKeys, SudoConfig};
+use crate::{AccountId, BalancesConfig, Runtime, RuntimeGenesisConfig, SessionKeys, SudoConfig};
 use alloc::{vec, vec::Vec};
 use frame_support::build_struct_json_patch;
+use pallet_revive::{AddressMapper, H160};
 use serde_json::Value;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_genesis_builder::{self, PresetId};
 use sp_keyring::Sr25519Keyring;
+
+/// The well-known Ethereum development accounts (Alith, Baltathar, Charleth, Dorothy, Ethan),
+/// the same ones Parity's revive dev node pre-funds and `eth-rpc --dev` signs with. Returned as the
+/// Substrate accounts `pallet_revive` maps their addresses to (address followed by 12 `0xEE`
+/// bytes). Their private keys are public, so these only belong in development chains.
+fn eth_dev_accounts() -> Vec<AccountId> {
+	[
+		sp_core::hex2array!("f24ff3a9cf04c71dbc94d0b566f7a27b94566cac"),
+		sp_core::hex2array!("3cd0a705a2dc65e5b1e1205896baa2be8a07c6e0"),
+		sp_core::hex2array!("798d4ba9baf0064ec19eb4f0a1a45785ae9d6dfc"),
+		sp_core::hex2array!("773539d4ac0e786233d90a233654ccee26a613d9"),
+		sp_core::hex2array!("ff64d3f6efe2317ee2807d223a0bdc4c0c49dfdb"),
+	]
+	.into_iter()
+	.map(|address| {
+		<Runtime as pallet_revive::Config>::AddressMapper::to_fallback_account_id(&H160(address))
+	})
+	.collect()
+}
 
 // Returns the genesis config presets populated with given parameters.
 fn testnet_genesis(
@@ -69,12 +89,15 @@ pub fn development_config_genesis() -> Value {
 			sp_keyring::Sr25519Keyring::Alice.public().into(),
 			sp_keyring::Ed25519Keyring::Alice.public().into(),
 		)],
-		vec![
+		[
 			Sr25519Keyring::Alice.to_account_id(),
 			Sr25519Keyring::Bob.to_account_id(),
 			Sr25519Keyring::AliceStash.to_account_id(),
 			Sr25519Keyring::BobStash.to_account_id(),
-		],
+		]
+		.into_iter()
+		.chain(eth_dev_accounts())
+		.collect(),
 		sp_keyring::Sr25519Keyring::Alice.to_account_id(),
 	)
 }
@@ -97,6 +120,7 @@ pub fn local_config_genesis() -> Value {
 		Sr25519Keyring::iter()
 			.filter(|v| v != &Sr25519Keyring::One && v != &Sr25519Keyring::Two)
 			.map(|v| v.to_account_id())
+			.chain(eth_dev_accounts())
 			.collect::<Vec<_>>(),
 		Sr25519Keyring::Alice.to_account_id(),
 	)

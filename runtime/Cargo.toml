@@ -23,6 +23,7 @@ frame-system-rpc-runtime-api.workspace = true
 frame-system.workspace = true
 frame-try-runtime = { optional = true, workspace = true }
 pallet-assets.workspace = true
+pallet-assets-precompiles.workspace = true
 pallet-aura.workspace = true
 pallet-authorship.workspace = true
 pallet-balances.workspace = true
@@ -31,6 +32,7 @@ pallet-grandpa.workspace = true
 pallet-indices.workspace = true
 pallet-insecure-randomness-collective-flip.workspace = true
 pallet-preimage.workspace = true
+pallet-revive.workspace = true
 pallet-session.workspace = true
 pallet-sudo.workspace = true
 pallet-xode-account-freezer.workspace = true
@@ -74,6 +76,7 @@ std = [
 	"frame-system/std",
 	"frame-try-runtime?/std",
 	"pallet-assets/std",
+	"pallet-assets-precompiles/std",
 	"pallet-aura/std",
 	"pallet-authorship/std",
 	"pallet-balances/std",
@@ -82,6 +85,7 @@ std = [
 	"pallet-indices/std",
 	"pallet-insecure-randomness-collective-flip/std",
 	"pallet-preimage/std",
+	"pallet-revive/std",
 	"pallet-session/std",
 	"pallet-sudo/std",
 	"pallet-xode-account-freezer/std",
@@ -117,11 +121,13 @@ runtime-benchmarks = [
 	"frame-system-benchmarking/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
 	"pallet-assets/runtime-benchmarks",
+	"pallet-assets-precompiles/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-contracts/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
 	"pallet-indices/runtime-benchmarks",
 	"pallet-preimage/runtime-benchmarks",
+	"pallet-revive/runtime-benchmarks",
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-xode-account-freezer/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
@@ -138,6 +144,7 @@ try-runtime = [
 	"frame-system/try-runtime",
 	"frame-try-runtime/try-runtime",
 	"pallet-assets/try-runtime",
+	"pallet-assets-precompiles/try-runtime",
 	"pallet-aura/try-runtime",
 	"pallet-authorship/try-runtime",
 	"pallet-balances/try-runtime",
@@ -146,6 +153,7 @@ try-runtime = [
 	"pallet-indices/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
 	"pallet-preimage/try-runtime",
+	"pallet-revive/try-runtime",
 	"pallet-session/try-runtime",
 	"pallet-sudo/try-runtime",
 	"pallet-xode-account-freezer/try-runtime",

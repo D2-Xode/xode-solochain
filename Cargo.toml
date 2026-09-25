@@ -60,6 +60,7 @@ frame-system-benchmarking = { version = "45.0.0", default-features = false }
 frame-system-rpc-runtime-api = { version = "40.0.0", default-features = false }
 frame-try-runtime = { version = "0.51.0", default-features = false }
 pallet-assets = { version = "48.1.0", default-features = false }
+pallet-assets-precompiles = { version = "0.4.1", default-features = false }
 pallet-aura = { version = "44.0.0", default-features = false }
 pallet-authorship = { version = "45.0.0", default-features = false }
 pallet-balances = { version = "46.0.0", default-features = false }
@@ -68,6 +69,7 @@ pallet-grandpa = { version = "45.0.0", default-features = false }
 pallet-indices = { version = "45.0.0", default-features = false }
 pallet-insecure-randomness-collective-flip = { version = "33.0.0", default-features = false }
 pallet-preimage = { version = "45.0.0", default-features = false }
+pallet-revive = { version = "0.12.2", default-features = false }
 pallet-session = { version = "45.1.0", default-features = false }
 pallet-staking = { version = "45.0.0", default-features = false }
 pallet-sudo = { version = "45.0.0", default-features = false }
