@@ -31,4 +31,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_timestamp, Timestamp]
 	[pallet_sudo, Sudo]
 	[pallet_xode_account_freezer, AccountFreezer]
+	[pallet_collective, TechnicalCommittee]
+	[pallet_membership, TechnicalCommitteeMembership]
+	[pallet_whitelist, Whitelist]
 );

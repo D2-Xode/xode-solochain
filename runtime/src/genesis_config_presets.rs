@@ -15,7 +15,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{AccountId, BalancesConfig, RuntimeGenesisConfig, SessionKeys, SudoConfig};
+use crate::{
+	AccountId, BalancesConfig, RuntimeGenesisConfig, SessionKeys, SudoConfig,
+	TechnicalCommitteeMembershipConfig, TreasuryCouncilMembershipConfig,
+};
 use alloc::{vec, vec::Vec};
 use frame_support::build_struct_json_patch;
 use serde_json::Value;
@@ -29,6 +32,8 @@ fn testnet_genesis(
 	initial_authorities: Vec<(AccountId, AuraId, GrandpaId)>,
 	endowed_accounts: Vec<AccountId>,
 	root: AccountId,
+	technical_committee: Vec<AccountId>,
+	treasury_council: Vec<AccountId>,
 ) -> Value {
 	build_struct_json_patch!(RuntimeGenesisConfig {
 		balances: BalancesConfig {
@@ -58,6 +63,18 @@ fn testnet_genesis(
 			desired_candidates: initial_authorities.iter().map(|x| x.0.clone()).collect::<Vec<_>>(),
 		},
 		sudo: SudoConfig { key: Some(root) },
+		// Only the membership pallets are seeded; each one initializes its collective's members
+		// through `MembershipInitialized`.
+		technical_committee_membership: TechnicalCommitteeMembershipConfig {
+			members: technical_committee
+				.try_into()
+				.expect("genesis technical committee must fit within MaxMembers; qed"),
+		},
+		treasury_council_membership: TreasuryCouncilMembershipConfig {
+			members: treasury_council
+				.try_into()
+				.expect("genesis treasury council must fit within MaxMembers; qed"),
+		},
 	})
 }
 
@@ -76,6 +93,8 @@ pub fn development_config_genesis() -> Value {
 			Sr25519Keyring::BobStash.to_account_id(),
 		],
 		sp_keyring::Sr25519Keyring::Alice.to_account_id(),
+		vec![Sr25519Keyring::Alice.to_account_id()],
+		vec![Sr25519Keyring::Alice.to_account_id()],
 	)
 }
 
@@ -99,6 +118,16 @@ pub fn local_config_genesis() -> Value {
 			.map(|v| v.to_account_id())
 			.collect::<Vec<_>>(),
 		Sr25519Keyring::Alice.to_account_id(),
+		vec![
+			Sr25519Keyring::Alice.to_account_id(),
+			Sr25519Keyring::Bob.to_account_id(),
+			Sr25519Keyring::Charlie.to_account_id(),
+		],
+		vec![
+			Sr25519Keyring::Dave.to_account_id(),
+			Sr25519Keyring::Eve.to_account_id(),
+			Sr25519Keyring::Ferdie.to_account_id(),
+		],
 	)
 }
 

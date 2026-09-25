@@ -29,8 +29,8 @@ use frame_support::{
 	traits::{
 		fungible::HoldConsideration,
 		tokens::{PayFromAccount, UnityAssetBalanceConversion},
-		AsEnsureOriginWithArg, ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, LinearStoragePrice,
-		Nothing, VariantCountOf,
+		AsEnsureOriginWithArg, ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, EitherOfDiverse,
+		LinearStoragePrice, Nothing, VariantCountOf,
 	},
 	weights::{
 		constants::{RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
@@ -39,6 +39,7 @@ use frame_support::{
 	PalletId,
 };
 use frame_system::{limits::{BlockLength, BlockWeights}, EnsureRoot, EnsureSigned, EnsureWithSuccess};
+use pallet_collective::{EnsureProportionAtLeast, EnsureProportionMoreThan};
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_runtime::{
@@ -50,9 +51,9 @@ use sp_version::RuntimeVersion;
 // Local module imports
 use super::{
 	AccountId, Aura, Balance, Balances, Block, BlockNumber, Grandpa, Hash, Nonce, OriginCaller,
-	PalletInfo, RandomnessCollectiveFlip, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
-	RuntimeHoldReason, RuntimeOrigin, RuntimeTask, SessionKeys, System, Timestamp, XodeStaking,
-	DAYS, EXISTENTIAL_DEPOSIT, HOURS, MICRO_UNIT, MILLI_UNIT, SLOT_DURATION, UNIT, VERSION,
+	PalletInfo, Preimage, RandomnessCollectiveFlip, Runtime, RuntimeCall, RuntimeEvent,
+	RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask, SessionKeys, System,
+	TechnicalCommittee, Timestamp, TreasuryCouncil, XodeStaking, DAYS, EXISTENTIAL_DEPOSIT, HOURS, MICRO_UNIT, MILLI_UNIT, SLOT_DURATION, UNIT, VERSION,
 };
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
@@ -103,7 +104,9 @@ impl frame_system::Config for Runtime {
 impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
 	type DisabledValidators = ();
-	type MaxAuthorities = ConstU32<32>;
+	// Must be >= `MaxStakingCandidates`: `XodeStaking::new_session` can hand the session up to
+	// that many authors.
+	type MaxAuthorities = MaxStakingCandidates;
 	type AllowMultipleBlocksPerSlot = ConstBool<false>;
 	type SlotDuration = pallet_aura::MinimumPeriodTimesTwo<Runtime>;
 }
@@ -112,7 +115,7 @@ impl pallet_grandpa::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 
 	type WeightInfo = ();
-	type MaxAuthorities = ConstU32<32>;
+	type MaxAuthorities = MaxStakingCandidates;
 	type MaxNominators = ConstU32<0>;
 	type MaxSetIdSessionEntries = ConstU64<0>;
 
@@ -157,9 +160,9 @@ impl pallet_authorship::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MaxStakingCandidates: u32 = 100;
+	pub const MaxStakingCandidates: u32 = 50;
 	pub const MaxDelegationsPerCandidate: u32 = 100;
-	pub const MinCandidateBond: Balance = 10 * UNIT;
+	pub const MinCandidateBond: Balance = 100 * UNIT;
 	pub const MaxStalingPeriod: BlockNumber = 14 * DAYS;
 }
 
@@ -228,13 +231,12 @@ impl pallet_sudo::Config for Runtime {
 ///
 /// Freezes part of an account's native `Balances` so it cannot be spent, transferred, or reaped
 /// by the existential deposit check - while still counting toward its total balance. Restricted
-/// to `FreezeOrigin`, i.e. only callable via `Sudo::sudo(...)`, since this runtime has no other
-/// source of root authority.
+/// to Root or a 2/3 Technical Committee motion.
 impl pallet_xode_account_freezer::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type FreezeOrigin = EnsureRoot<AccountId>;
+	type FreezeOrigin = RootOrTwoThirdsTechnicalCommittee;
 	type WeightInfo = pallet_xode_account_freezer::weights::SubstrateWeight<Runtime>;
 }
 
@@ -277,7 +279,7 @@ impl pallet_preimage::Config for Runtime {
 	type WeightInfo = pallet_preimage::weights::SubstrateWeight<Runtime>;
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
-	type ManagerOrigin = EnsureRoot<AccountId>;
+	type ManagerOrigin = RootOrAllTechnicalCommittee;
 	type Consideration = HoldConsideration<
 		AccountId,
 		Balances,
@@ -302,7 +304,7 @@ impl pallet_assets::Config for Runtime {
 	type AssetIdParameter = codec::Compact<u32>;
 	type Currency = Balances;
 	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
-	type ForceOrigin = EnsureRoot<AccountId>;
+	type ForceOrigin = RootOrTwoThirdsTreasuryCouncil;
 	type AssetDeposit = AssetDeposit;
 	type AssetAccountDeposit = AssetAccountDeposit;
 	type MetadataDepositBase = AssetsMetadataDepositBase;
@@ -331,7 +333,7 @@ parameter_types! {
 
 impl pallet_treasury::Config for Runtime {
 	type Currency = Balances;
-	type RejectOrigin = EnsureRoot<AccountId>;
+	type RejectOrigin = RootOrTwoThirdsTreasuryCouncil;
 	type RuntimeEvent = RuntimeEvent;
 	type SpendPeriod = TreasurySpendPeriod;
 	type Burn = TreasuryBurn;
@@ -340,7 +342,7 @@ impl pallet_treasury::Config for Runtime {
 	type WeightInfo = pallet_treasury::weights::SubstrateWeight<Runtime>;
 	type SpendFunds = ();
 	type MaxApprovals = TreasuryMaxApprovals;
-	type SpendOrigin = EnsureWithSuccess<EnsureRoot<AccountId>, AccountId, TreasuryMaxSpend>;
+	type SpendOrigin = EnsureWithSuccess<RootOrTwoThirdsTreasuryCouncil, AccountId, TreasuryMaxSpend>;
 	type AssetKind = ();
 	type Beneficiary = AccountId;
 	type BeneficiaryLookup = IdentityLookup<AccountId>;
@@ -391,4 +393,136 @@ impl pallet_contracts::Config for Runtime {
 	type Environment = ();
 	type ApiVersion = ();
 	type Xcm = ();
+}
+
+// Governance mirrors the live Xode network (xode-blockchain): a Technical Committee and a
+// Treasury Council, each a `pallet_collective` instance whose members are managed by a
+// `pallet_membership` instance. The Technical Committee holds Root through `pallet_whitelist`
+// (`dispatch_whitelisted_call*` dispatches as Root), which is what replaces Sudo.
+//
+// Every privileged origin below also accepts Root. While Sudo is still in the runtime this keeps
+// it as a fallback (and lets it seed the councils with `reset_members` after the upgrade, since
+// genesis config does not run on a live chain). Once Sudo is removed, Root is only reachable
+// through a 2/3 Technical Committee motion via `Whitelist`.
+
+/// ======================
+/// Governance - Technical
+/// ======================
+pub type TechnicalCommitteeInstance = pallet_collective::Instance1;
+
+pub type EnsureTwoThirdsTechnicalCommittee =
+	EnsureProportionMoreThan<AccountId, TechnicalCommitteeInstance, 2, 3>;
+pub type EnsureAllTechnicalCommittee =
+	EnsureProportionAtLeast<AccountId, TechnicalCommitteeInstance, 1, 1>;
+pub type RootOrTwoThirdsTechnicalCommittee =
+	EitherOfDiverse<EnsureRoot<AccountId>, EnsureTwoThirdsTechnicalCommittee>;
+pub type RootOrAllTechnicalCommittee =
+	EitherOfDiverse<EnsureRoot<AccountId>, EnsureAllTechnicalCommittee>;
+
+parameter_types! {
+	pub const TechnicalCommitteeMotionDuration: BlockNumber = 5 * DAYS;
+	pub const TechnicalCommitteeMaxProposals: u32 = 100;
+	pub const TechnicalCommitteeMaxMembers: u32 = 100;
+	pub TechnicalMaxProposalWeight: Weight =
+		Perbill::from_percent(50) * RuntimeBlockWeights::get().max_block;
+}
+
+impl pallet_collective::Config<TechnicalCommitteeInstance> for Runtime {
+	type RuntimeOrigin = RuntimeOrigin;
+	type Proposal = RuntimeCall;
+	type RuntimeEvent = RuntimeEvent;
+	type MotionDuration = TechnicalCommitteeMotionDuration;
+	type MaxProposals = TechnicalCommitteeMaxProposals;
+	type MaxMembers = TechnicalCommitteeMaxMembers;
+	type DefaultVote = pallet_collective::PrimeDefaultVote;
+	type SetMembersOrigin = RootOrAllTechnicalCommittee;
+	type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
+	type MaxProposalWeight = TechnicalMaxProposalWeight;
+	type DisapproveOrigin = RootOrAllTechnicalCommittee;
+	type KillOrigin = RootOrAllTechnicalCommittee;
+	type Consideration = ();
+}
+
+parameter_types! {
+	pub const TechnicalMembershipMaxMembers: u32 = 100;
+}
+
+impl pallet_membership::Config<TechnicalCommitteeInstance> for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type AddOrigin = RootOrTwoThirdsTechnicalCommittee;
+	type RemoveOrigin = RootOrAllTechnicalCommittee;
+	type SwapOrigin = RootOrAllTechnicalCommittee;
+	type ResetOrigin = RootOrAllTechnicalCommittee;
+	type PrimeOrigin = RootOrAllTechnicalCommittee;
+	type MembershipInitialized = TechnicalCommittee;
+	type MembershipChanged = TechnicalCommittee;
+	type MaxMembers = TechnicalMembershipMaxMembers;
+	type WeightInfo = pallet_membership::weights::SubstrateWeight<Runtime>;
+}
+
+/// =====================
+/// Governance - Treasury
+/// =====================
+pub type TreasuryCouncilInstance = pallet_collective::Instance2;
+
+pub type EnsureTwoThirdsTreasuryCouncil =
+	EnsureProportionMoreThan<AccountId, TreasuryCouncilInstance, 2, 3>;
+pub type EnsureAllTreasuryCouncil =
+	EnsureProportionAtLeast<AccountId, TreasuryCouncilInstance, 1, 1>;
+pub type RootOrTwoThirdsTreasuryCouncil =
+	EitherOfDiverse<EnsureRoot<AccountId>, EnsureTwoThirdsTreasuryCouncil>;
+pub type RootOrAllTreasuryCouncil =
+	EitherOfDiverse<EnsureRoot<AccountId>, EnsureAllTreasuryCouncil>;
+
+parameter_types! {
+	pub const TreasuryCouncilMotionDuration: BlockNumber = 5 * DAYS;
+	pub const TreasuryCouncilMaxProposals: u32 = 100;
+	pub const TreasuryCouncilMaxMembers: u32 = 100;
+	pub TreasuryMaxProposalWeight: Weight =
+		Perbill::from_percent(50) * RuntimeBlockWeights::get().max_block;
+}
+
+impl pallet_collective::Config<TreasuryCouncilInstance> for Runtime {
+	type RuntimeOrigin = RuntimeOrigin;
+	type Proposal = RuntimeCall;
+	type RuntimeEvent = RuntimeEvent;
+	type MotionDuration = TreasuryCouncilMotionDuration;
+	type MaxProposals = TreasuryCouncilMaxProposals;
+	type MaxMembers = TreasuryCouncilMaxMembers;
+	type DefaultVote = pallet_collective::PrimeDefaultVote;
+	type SetMembersOrigin = RootOrAllTreasuryCouncil;
+	type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
+	type MaxProposalWeight = TreasuryMaxProposalWeight;
+	// As on Xode: the Technical Committee can veto or kill Treasury Council motions.
+	type DisapproveOrigin = RootOrAllTechnicalCommittee;
+	type KillOrigin = RootOrAllTechnicalCommittee;
+	type Consideration = ();
+}
+
+parameter_types! {
+	pub const TreasuryMembershipMaxMembers: u32 = 100;
+}
+
+impl pallet_membership::Config<TreasuryCouncilInstance> for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type AddOrigin = RootOrTwoThirdsTreasuryCouncil;
+	type RemoveOrigin = RootOrAllTreasuryCouncil;
+	type SwapOrigin = RootOrAllTreasuryCouncil;
+	type ResetOrigin = RootOrAllTreasuryCouncil;
+	type PrimeOrigin = RootOrAllTreasuryCouncil;
+	type MembershipInitialized = TreasuryCouncil;
+	type MembershipChanged = TreasuryCouncil;
+	type MaxMembers = TreasuryMembershipMaxMembers;
+	type WeightInfo = pallet_membership::weights::SubstrateWeight<Runtime>;
+}
+
+/// Lets the Technical Committee act as Root: a 2/3 motion whitelists a call hash, then a 2/3
+/// motion dispatches it (`dispatch_whitelisted_call*`), which runs the call with Root origin.
+impl pallet_whitelist::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type WhitelistOrigin = EnsureTwoThirdsTechnicalCommittee;
+	type DispatchWhitelistedOrigin = EnsureTwoThirdsTechnicalCommittee;
+	type Preimages = Preimage;
+	type WeightInfo = pallet_whitelist::weights::SubstrateWeight<Runtime>;
 }

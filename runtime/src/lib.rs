@@ -69,7 +69,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	//   `spec_version`, and `authoring_version` are the same between Wasm and native.
 	// This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 	//   the compatible custom types.
-	spec_version: 1,
+	spec_version: 2,
 	impl_version: 1,
 	apis: apis::RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -269,4 +269,22 @@ mod runtime {
 	// `pallets/account-freezer/src/lib.rs`.
 	#[runtime::pallet_index(18)]
 	pub type AccountFreezer = pallet_xode_account_freezer;
+
+	// Governance, mirroring the live Xode network: a Technical Committee (holds Root through
+	// `Whitelist`) and a Treasury Council (treasury and asset force operations). See the
+	// "Governance" sections in runtime/src/configs/mod.rs.
+	#[runtime::pallet_index(19)]
+	pub type TechnicalCommittee = pallet_collective<Instance1>;
+
+	#[runtime::pallet_index(20)]
+	pub type TechnicalCommitteeMembership = pallet_membership<Instance1>;
+
+	#[runtime::pallet_index(21)]
+	pub type TreasuryCouncil = pallet_collective<Instance2>;
+
+	#[runtime::pallet_index(22)]
+	pub type TreasuryCouncilMembership = pallet_membership<Instance2>;
+
+	#[runtime::pallet_index(23)]
+	pub type Whitelist = pallet_whitelist;
 }

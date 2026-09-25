@@ -26,10 +26,12 @@ pallet-assets.workspace = true
 pallet-aura.workspace = true
 pallet-authorship.workspace = true
 pallet-balances.workspace = true
+pallet-collective.workspace = true
 pallet-contracts.workspace = true
 pallet-grandpa.workspace = true
 pallet-indices.workspace = true
 pallet-insecure-randomness-collective-flip.workspace = true
+pallet-membership.workspace = true
 pallet-preimage.workspace = true
 pallet-session.workspace = true
 pallet-sudo.workspace = true
@@ -39,6 +41,7 @@ pallet-transaction-payment-rpc-runtime-api.workspace = true
 pallet-transaction-payment.workspace = true
 pallet-treasury.workspace = true
 pallet-utility.workspace = true
+pallet-whitelist.workspace = true
 pallet-xode-staking.workspace = true
 scale-info = { features = ["derive", "serde"], workspace = true }
 serde_json = { workspace = true, default-features = false, features = ["alloc"] }
@@ -77,10 +80,12 @@ std = [
 	"pallet-aura/std",
 	"pallet-authorship/std",
 	"pallet-balances/std",
+	"pallet-collective/std",
 	"pallet-contracts/std",
 	"pallet-grandpa/std",
 	"pallet-indices/std",
 	"pallet-insecure-randomness-collective-flip/std",
+	"pallet-membership/std",
 	"pallet-preimage/std",
 	"pallet-session/std",
 	"pallet-sudo/std",
@@ -90,6 +95,7 @@ std = [
 	"pallet-transaction-payment/std",
 	"pallet-treasury/std",
 	"pallet-utility/std",
+	"pallet-whitelist/std",
 	"pallet-xode-staking/std",
 	"scale-info/std",
 	"serde_json/std",
@@ -118,9 +124,11 @@ runtime-benchmarks = [
 	"frame-system/runtime-benchmarks",
 	"pallet-assets/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
+	"pallet-collective/runtime-benchmarks",
 	"pallet-contracts/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
 	"pallet-indices/runtime-benchmarks",
+	"pallet-membership/runtime-benchmarks",
 	"pallet-preimage/runtime-benchmarks",
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-xode-account-freezer/runtime-benchmarks",
@@ -128,6 +136,7 @@ runtime-benchmarks = [
 	"pallet-transaction-payment/runtime-benchmarks",
 	"pallet-treasury/runtime-benchmarks",
 	"pallet-utility/runtime-benchmarks",
+	"pallet-whitelist/runtime-benchmarks",
 	"pallet-xode-staking/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]
@@ -141,10 +150,12 @@ try-runtime = [
 	"pallet-aura/try-runtime",
 	"pallet-authorship/try-runtime",
 	"pallet-balances/try-runtime",
+	"pallet-collective/try-runtime",
 	"pallet-contracts/try-runtime",
 	"pallet-grandpa/try-runtime",
 	"pallet-indices/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
+	"pallet-membership/try-runtime",
 	"pallet-preimage/try-runtime",
 	"pallet-session/try-runtime",
 	"pallet-sudo/try-runtime",
@@ -153,6 +164,7 @@ try-runtime = [
 	"pallet-transaction-payment/try-runtime",
 	"pallet-treasury/try-runtime",
 	"pallet-utility/try-runtime",
+	"pallet-whitelist/try-runtime",
 	"pallet-xode-staking/try-runtime",
 	"sp-runtime/try-runtime",
 ]
